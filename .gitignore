@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# 実データ由来で private なリポジトリ名・PR タイトル等を含むため、コミットしない
+test/fixtures/

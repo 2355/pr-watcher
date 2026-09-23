@@ -1,0 +1,29 @@
+{
+  "name": "pr-watcher",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "icons": "tsx scripts/generate-icons.ts"
+  },
+  "dependencies": {
+    "domhandler": "^6.0.1",
+    "domutils": "^4.0.2",
+    "htmlparser2": "^12.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.0.9",
+    "@types/chrome": "^0.3.0",
+    "@types/node": "^26.6.2",
+    "happy-dom": "^20.14.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  }
+}
