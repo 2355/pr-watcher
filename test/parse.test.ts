@@ -73,6 +73,7 @@ describe.runIf(fixturesAvailable)('parseMergeBox', () => {
     expect(parseMergeBox(loadJson('merge-box-pending-rerequest.json'))).toEqual({
       opinionatedReviews: [],
       pendingReviewers: raw.pendingReviewRequests.map((r) => r.reviewer.login),
+      awaitingReview: true,
     });
   });
 
@@ -143,5 +144,23 @@ describe('parseSidebarReviewers（構造変化の検知）', () => {
 
   it('レビュアーがいなければ空配列を返す', () => {
     expect(parseSidebarReviewers('<form id="pull-request-reviewers-form-1"></form>')).toEqual([]);
+  });
+});
+
+describe('parseMergeBox: レビュー待ちの判定', () => {
+  const mergeBox = (pendingReviewRequests: { reviewer: { login: string; type: string } }[]) => ({
+    pullRequest: { latestOpinionatedReviews: [], pendingReviewRequests },
+  });
+
+  it('チーム宛ての依頼だけでもレビュー待ちとみなす', () => {
+    expect(parseMergeBox(mergeBox([{ reviewer: { login: 'team', type: 'TEAM' } }]))).toEqual({
+      opinionatedReviews: [],
+      pendingReviewers: [],
+      awaitingReview: true,
+    });
+  });
+
+  it('依頼が無ければレビュー待ちではない', () => {
+    expect(parseMergeBox(mergeBox([])).awaitingReview).toBe(false);
   });
 });

@@ -80,6 +80,7 @@ describe.runIf(fixturesAvailable)('buildSnapshot', () => {
       ],
       reviewRequests: [],
       warnings: [],
+      truncated: { myPrs: false, reviewRequests: false },
     });
   });
 

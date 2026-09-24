@@ -10,6 +10,7 @@ export type PopupState = {
   onRefresh: () => void;
   intervalMinutes: number;
   onIntervalChange: (minutes: number) => void;
+  now: Date;
 };
 
 type BadgeState = 'open' | 'draft' | 'commented' | 'changes_requested' | 'approved';
@@ -51,6 +52,24 @@ const timeFormat = new Intl.DateTimeFormat('ja-JP', {
 
 const minuteFormat = new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
+const dateTimeFormat = new Intl.DateTimeFormat('ja-JP', {
+  month: 'numeric',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+// 行の幅が狭いので短く表し、日単位になっても半日の差が分かるよう時間まで残す
+const formatElapsed = (from: Date, now: Date): string => {
+  // 時計のずれで負になっても表示が崩れないようにする
+  const minutes = Math.max(0, Math.floor((now.getTime() - from.getTime()) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const restHours = hours % 24;
+  return `${Math.floor(hours / 24)}d${restHours > 0 ? `${restHours}h` : ''}`;
+};
+
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
   props: { className?: string; text?: string; attrs?: Record<string, string> } = {},
@@ -87,7 +106,17 @@ const myPrBadge = (pr: MyPullRequest): BadgeState => {
   return pr.review.state === 'none' ? 'open' : pr.review.state;
 };
 
-const prRow = (pr: PullRequestRow, badge: BadgeState): HTMLLIElement => {
+const waitingLabel = (waitingSince: string, now: Date): HTMLElement => {
+  const since = new Date(waitingSince);
+  return el('span', {
+    className: 'waiting',
+    text: formatElapsed(since, now),
+    // 実際の依頼日時ではなく検知した時刻なので、拡張を入れる前や PC がスリープしていた間の依頼は短く出ることを明かしておく
+    attrs: { title: `${dateTimeFormat.format(since)} にレビュー待ちを検知` },
+  });
+};
+
+const prRow = (pr: PullRequestRow, badge: BadgeState, now: Date): HTMLLIElement => {
   const { icon: iconName, label } = badges[badge];
   const content = [
     el('span', { className: 'badge', attrs: { 'data-state': badge, 'aria-label': label, title: label } }, [
@@ -95,7 +124,10 @@ const prRow = (pr: PullRequestRow, badge: BadgeState): HTMLLIElement => {
     ]),
     el('span', { className: 'text' }, [
       el('span', { className: 'title', text: pr.title }),
-      el('span', { className: 'meta', text: `${pr.repo}#${pr.number}` }),
+      el('span', { className: 'meta' }, [
+        document.createTextNode(`${pr.repo}#${pr.number}`),
+        ...(pr.waitingSince ? [waitingLabel(pr.waitingSince, now)] : []),
+      ]),
     ]),
     ...(pr.ci
       ? [
@@ -163,7 +195,7 @@ const header = (state: PopupState): HTMLElement => {
 };
 
 export const renderPopup = (root: HTMLElement, state: PopupState): void => {
-  const { snapshot } = state;
+  const { snapshot, now } = state;
   const body: Node[] = [header(state)];
 
   if (snapshot?.status === 'error') {
@@ -193,8 +225,8 @@ export const renderPopup = (root: HTMLElement, state: PopupState): void => {
       body.push(el('ul', { className: 'warnings' }, snapshot.warnings.map((w) => el('li', { text: w }))));
     }
     body.push(
-      prSection('自分のPR', snapshot.myPrs.map((pr) => prRow(pr, myPrBadge(pr)))),
-      prSection('レビュー中のPR', snapshot.reviewRequests.map((pr) => prRow(pr, pr.isDraft ? 'draft' : 'open'))),
+      prSection('自分のPR', snapshot.myPrs.map((pr) => prRow(pr, myPrBadge(pr), now))),
+      prSection('レビュー中のPR', snapshot.reviewRequests.map((pr) => prRow(pr, pr.isDraft ? 'draft' : 'open', now))),
     );
   }
 

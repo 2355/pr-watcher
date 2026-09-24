@@ -15,6 +15,7 @@ const render = (
     onRefresh?: () => void;
     intervalMinutes?: number;
     onIntervalChange?: (minutes: number) => void;
+    now?: Date;
   } = {},
 ) =>
   renderPopup(root, {
@@ -23,6 +24,7 @@ const render = (
     onRefresh: options.onRefresh ?? (() => {}),
     intervalMinutes: options.intervalMinutes ?? 5,
     onIntervalChange: options.onIntervalChange ?? (() => {}),
+    now: options.now ?? new Date('2026-09-23T12:00:00Z'),
   });
 
 const intervalInput = () => root.querySelector<HTMLInputElement>('input[data-action="interval"]')!;
@@ -76,6 +78,35 @@ describe('renderPopup: 一覧', () => {
 
     expect(section('自分のPR').textContent).toContain('なし');
     expect(section('レビュー中のPR').textContent).toContain('なし');
+  });
+
+  it.each([
+    ['2026-09-23T11:59:30Z', '0m'],
+    ['2026-09-23T11:26:00Z', '34m'],
+    ['2026-09-23T11:01:00Z', '59m'],
+    ['2026-09-23T11:00:00Z', '1h'],
+    ['2026-09-23T06:30:00Z', '5h'],
+    ['2026-09-22T12:01:00Z', '23h'],
+    ['2026-09-22T12:00:00Z', '1d'],
+    ['2026-09-21T23:00:00Z', '1d13h'],
+    ['2026-09-21T12:00:00Z', '2d'],
+    ['2026-09-23T12:05:00Z', '0m'],
+  ])('レビュー待ちの PR には待ち始め %s からの経過時間を出す', (waitingSince, expected) => {
+    render(ok({ reviewRequests: [row({ waitingSince })] }), { now: new Date('2026-09-23T12:00:00Z') });
+
+    expect(section('レビュー中のPR').querySelector('.waiting')!.textContent).toBe(expected);
+  });
+
+  it('経過時間には実際の依頼日時ではなく検知した時刻であることを添える', () => {
+    render(ok({ myPrs: [myPr({ waitingSince: '2026-09-23T00:05:00Z' })] }));
+
+    expect(section('自分のPR').querySelector('.waiting')!.getAttribute('title')).toBe('9/23 09:05 にレビュー待ちを検知');
+  });
+
+  it('レビュー待ちでない PR には経過時間を出さない', () => {
+    render(ok({ myPrs: [myPr({ waitingSince: null })] }));
+
+    expect(section('自分のPR').querySelector('.waiting')).toBeNull();
   });
 });
 

@@ -159,6 +159,10 @@ a.row:hover {
   font-size: 12px;
 }
 
+.waiting::before {
+  content: ' · ';
+}
+
 .ci {
   flex: none;
   margin-top: 1px;

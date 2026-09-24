@@ -4,7 +4,16 @@ import { iconStateOf, type IconState } from './icon/state';
 import { isRefreshMessage } from './messages';
 import { applyRateLimit, shouldPoll } from './schedule';
 import { buildSnapshot, type Snapshot } from './snapshot';
-import { loadIntervalMinutes, loadSnapshot, onIntervalChanged, onSnapshotChanged, saveSnapshot } from './storage';
+import {
+  loadIntervalMinutes,
+  loadSnapshot,
+  loadWaitingSince,
+  onIntervalChanged,
+  onSnapshotChanged,
+  saveSnapshot,
+  saveWaitingSince,
+} from './storage';
+import { waitingSinceOf } from './waiting-since';
 
 const ALARM = 'refresh';
 // 読み物や会議などで操作しない時間は取得を続け、席を離れたと言える長さだけ操作が無ければ止める
@@ -34,8 +43,18 @@ let inFlight: Promise<void> | null = null;
 const refresh = (): Promise<void> => {
   inFlight ??= (async () => {
     try {
-      const [previous, intervalMinutes] = await Promise.all([loadSnapshot(), loadIntervalMinutes()]);
-      const snapshot = await buildSnapshot(createGitHubClient(fetch.bind(globalThis)), () => new Date());
+      const [previous, intervalMinutes, previousWaitingSince] = await Promise.all([
+        loadSnapshot(),
+        loadIntervalMinutes(),
+        loadWaitingSince(),
+      ]);
+      const snapshot = await buildSnapshot(
+        createGitHubClient(fetch.bind(globalThis)),
+        () => new Date(),
+        previousWaitingSince,
+      );
+      const waitingSince = waitingSinceOf(snapshot, previousWaitingSince);
+      if (waitingSince) await saveWaitingSince(waitingSince);
       await saveSnapshot(applyRateLimit(snapshot, previous, intervalMinutes, new Date()));
     } finally {
       inFlight = null;

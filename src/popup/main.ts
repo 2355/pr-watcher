@@ -22,6 +22,7 @@ const draw = (): void =>
     onRefresh,
     intervalMinutes,
     onIntervalChange: (minutes) => void saveIntervalMinutes(minutes),
+    now: new Date(),
   });
 
 async function onRefresh(): Promise<void> {

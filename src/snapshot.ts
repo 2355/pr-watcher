@@ -2,8 +2,13 @@ import type { GitHubClient } from './github/client';
 import { DataSourceError, toErrorMessage, type DataSourceErrorKind } from './github/errors';
 import type { CiState, PullRequestSummary } from './github/types';
 import { deriveAuthorReviewStatus, type AuthorReviewStatus } from './review-status';
+import { myPrKey, reviewRequestKey, type WaitingSince } from './waiting-since';
 
-export type PullRequestRow = PullRequestSummary & { ci: CiState | null };
+export type PullRequestRow = PullRequestSummary & {
+  ci: CiState | null;
+  // レビュー待ちでなければ null
+  waitingSince: string | null;
+};
 
 export type MyPullRequest = PullRequestRow & { review: AuthorReviewStatus };
 
@@ -15,6 +20,8 @@ export type Snapshot =
       reviewRequests: PullRequestRow[];
       // 取得は成功したが一部の情報が欠けていることを、利用者に伝えるためのもの
       warnings: string[];
+      // 上限件数で切り捨てられた一覧では、載っていない PR が消えたのか溢れただけなのか区別できない
+      truncated: { myPrs: boolean; reviewRequests: boolean };
     }
   | {
       status: 'error';
@@ -32,7 +39,7 @@ const reviewOf = async (
   client: GitHubClient,
   pr: PullRequestSummary,
   warnings: string[],
-): Promise<AuthorReviewStatus> => {
+): Promise<{ review: AuthorReviewStatus; awaitingReview: boolean }> => {
   const [mergeBox, sidebar] = await Promise.all([
     client.fetchMergeBox(pr.repo, pr.number),
     client.fetchSidebarReviewers(pr.repo, pr.number).catch((e: unknown) => {
@@ -41,16 +48,23 @@ const reviewOf = async (
       return null;
     }),
   ]);
-  return deriveAuthorReviewStatus({
-    // 自分の PR の作者は常に自分なので、ログイン名を別途問い合わせずに済む
-    me: pr.author,
-    opinionatedReviews: mergeBox.opinionatedReviews,
-    pendingReviewers: mergeBox.pendingReviewers,
-    sidebarReviewers: sidebar,
-  });
+  return {
+    review: deriveAuthorReviewStatus({
+      // 自分の PR の作者は常に自分なので、ログイン名を別途問い合わせずに済む
+      me: pr.author,
+      opinionatedReviews: mergeBox.opinionatedReviews,
+      pendingReviewers: mergeBox.pendingReviewers,
+      sidebarReviewers: sidebar,
+    }),
+    awaitingReview: mergeBox.awaitingReview,
+  };
 };
 
-export const buildSnapshot = async (client: GitHubClient, now: () => Date): Promise<Snapshot> => {
+export const buildSnapshot = async (
+  client: GitHubClient,
+  now: () => Date,
+  previousWaitingSince: WaitingSince = {},
+): Promise<Snapshot> => {
   try {
     const [mine, requested] = await Promise.all([
       client.searchPulls(MY_PRS_QUERY),
@@ -65,17 +79,24 @@ export const buildSnapshot = async (client: GitHubClient, now: () => Date): Prom
       ids.length > 0 ? client.fetchCiStates(ids) : new Map<string, { ci: CiState | null }>(),
       Promise.all(mine.items.map((pr) => reviewOf(client, pr, warnings))),
     ]);
-    const withCi = (pr: PullRequestSummary): PullRequestRow => ({
+    const fetchedAt = now().toISOString();
+    const toRow = (pr: PullRequestSummary, waitingKey: string | null): PullRequestRow => ({
       ...pr,
       ci: ciStates.get(pr.id)?.ci ?? null,
+      waitingSince: waitingKey === null ? null : (previousWaitingSince[waitingKey] ?? fetchedAt),
     });
 
     return {
       status: 'ok',
-      fetchedAt: now().toISOString(),
-      myPrs: mine.items.map((pr, i) => ({ ...withCi(pr), review: reviews[i]! })),
-      reviewRequests: requested.items.map(withCi),
+      fetchedAt,
+      myPrs: mine.items.map((pr, i) => {
+        const { review, awaitingReview } = reviews[i]!;
+        return { ...toRow(pr, awaitingReview ? myPrKey(pr.id) : null), review };
+      }),
+      // 検索条件が review-requested:@me なので、一覧に居る間はずっと自分のレビュー待ち
+      reviewRequests: requested.items.map((pr) => toRow(pr, reviewRequestKey(pr.id))),
       warnings,
+      truncated: { myPrs: mine.truncated, reviewRequests: requested.truncated },
     };
   } catch (e) {
     const error =

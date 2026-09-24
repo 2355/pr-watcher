@@ -101,7 +101,7 @@ export const parseDeferred = (json: unknown): Map<string, { ci: CiState | null }
 
 export const parseMergeBox = (
   json: unknown,
-): { opinionatedReviews: OpinionatedReview[]; pendingReviewers: string[] } => {
+): { opinionatedReviews: OpinionatedReview[]; pendingReviewers: string[]; awaitingReview: boolean } => {
   const pr = validate(mergeBoxSchema, json, 'レビュー状態').pullRequest;
   return {
     opinionatedReviews: pr.latestOpinionatedReviews.map((r) => ({
@@ -112,6 +112,8 @@ export const parseMergeBox = (
     pendingReviewers: pr.pendingReviewRequests
       .filter((r) => r.reviewer.type === 'USER')
       .map((r) => r.reviewer.login),
+    // 待ち時間の表示ではチームへの依頼も「レビュー待ち」に数える
+    awaitingReview: pr.pendingReviewRequests.length > 0,
   };
 };
 

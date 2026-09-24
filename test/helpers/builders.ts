@@ -12,6 +12,7 @@ export const row = (overrides: Partial<PullRequestRow> = {}): PullRequestRow => 
   isDraft: false,
   updatedAt: '2026-09-23T00:00:00Z',
   ci: 'success',
+  waitingSince: null,
   ...overrides,
 });
 
@@ -30,5 +31,6 @@ export const ok = (overrides: Partial<OkSnapshot> = {}): Snapshot => ({
   myPrs: [],
   reviewRequests: [],
   warnings: [],
+  truncated: { myPrs: false, reviewRequests: false },
   ...overrides,
 });
