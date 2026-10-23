@@ -32,8 +32,8 @@ export type Snapshot =
       waitMinutes?: number;
     };
 
-const MY_PRS_QUERY = 'is:pr author:@me state:open archived:false sort:updated-desc';
-const REVIEW_REQUESTS_QUERY = 'is:pr review-requested:@me state:open archived:false sort:updated-desc';
+const MY_PRS_QUERY = 'is:pr author:@me state:open archived:false sort:created-desc';
+const REVIEW_REQUESTS_QUERY = 'is:pr review-requested:@me state:open archived:false sort:created-desc';
 
 const reviewOf = async (
   client: GitHubClient,
