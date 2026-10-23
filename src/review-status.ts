@@ -7,6 +7,8 @@ export type AuthorReviewStatus = {
   // commented も含めるのは、指摘コメントも修正対応が必要なものとして扱う方針のため
   needsFix: boolean;
   approved: boolean;
+  // レビュー済みの人と依頼中の人。誰に見てもらっているかを知るためのものなので bot と自分は含めない
+  reviewers: string[];
 };
 
 type Input = {
@@ -19,6 +21,8 @@ type Input = {
 
 // レビュー bot はほぼ全 PR にコメントするため、数えると要修正が常に立ってしまう
 const isBot = (login: string): boolean => login.endsWith('[bot]');
+
+const isOtherHuman = (login: string, me: string): boolean => !isBot(login) && login !== me;
 
 export const deriveAuthorReviewStatus = ({
   me,
@@ -34,7 +38,7 @@ export const deriveAuthorReviewStatus = ({
   for (const r of opinionatedReviews) states.set(r.login, r.state);
 
   const pending = new Set(pendingReviewers);
-  const counted = [...states].filter(([login]) => !isBot(login) && login !== me);
+  const counted = [...states].filter(([login]) => isOtherHuman(login, me));
   // 再レビュー依頼中のレビュアーの指摘は「対応済みで返した」ものとみなす
   const active = new Set(counted.filter(([login]) => !pending.has(login)).map(([, s]) => s));
   const approved = counted.some(([, s]) => s === 'approved');
@@ -51,5 +55,6 @@ export const deriveAuthorReviewStatus = ({
     state,
     needsFix: state === 'changes_requested' || state === 'commented',
     approved,
+    reviewers: [...new Set([...states.keys(), ...pendingReviewers])].filter((login) => isOtherHuman(login, me)),
   };
 };

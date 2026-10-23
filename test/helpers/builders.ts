@@ -22,7 +22,7 @@ export const myPr = ({
   ...overrides
 }: Partial<Omit<MyPullRequest, 'review'>> & { review?: Partial<MyPullRequest['review']> } = {}): MyPullRequest => ({
   ...row({ author: 'me', ...overrides }),
-  review: { state: 'none', needsFix: false, approved: false, ...review },
+  review: { state: 'none', needsFix: false, approved: false, reviewers: [], ...review },
 });
 
 export const ok = (overrides: Partial<OkSnapshot> = {}): Snapshot => ({

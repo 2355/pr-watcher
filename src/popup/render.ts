@@ -116,7 +116,16 @@ const waitingLabel = (waitingSince: string, now: Date): HTMLElement => {
   });
 };
 
-const prRow = (pr: PullRequestRow, badge: BadgeState, now: Date): HTMLLIElement => {
+// reviewers が無い形で保存された古い snapshot も読むので、undefined でも描画を止めない
+const reviewersLabel = (reviewers: string[] | undefined): HTMLElement | undefined =>
+  reviewers && reviewers.length > 0
+    ? el('span', { className: 'reviewers', text: reviewers.map((login) => `@${login}`).join(' ') })
+    : undefined;
+
+// 「自分のPR」のレビュアーと見分けがつくよう、作者には by を付ける
+const authorLabel = (author: string): HTMLElement => el('span', { className: 'author', text: `by @${author}` });
+
+const prRow = (pr: PullRequestRow, badge: BadgeState, now: Date, people?: HTMLElement): HTMLLIElement => {
   const { icon: iconName, label } = badges[badge];
   const content = [
     el('span', { className: 'badge', attrs: { 'data-state': badge, 'aria-label': label, title: label } }, [
@@ -127,6 +136,7 @@ const prRow = (pr: PullRequestRow, badge: BadgeState, now: Date): HTMLLIElement 
       el('span', { className: 'meta' }, [
         document.createTextNode(`${pr.repo}#${pr.number}`),
         ...(pr.waitingSince ? [waitingLabel(pr.waitingSince, now)] : []),
+        ...(people ? [people] : []),
       ]),
     ]),
     ...(pr.ci
@@ -225,8 +235,11 @@ export const renderPopup = (root: HTMLElement, state: PopupState): void => {
       body.push(el('ul', { className: 'warnings' }, snapshot.warnings.map((w) => el('li', { text: w }))));
     }
     body.push(
-      prSection('自分のPR', snapshot.myPrs.map((pr) => prRow(pr, myPrBadge(pr), now))),
-      prSection('レビュー中のPR', snapshot.reviewRequests.map((pr) => prRow(pr, pr.isDraft ? 'draft' : 'open', now))),
+      prSection('自分のPR', snapshot.myPrs.map((pr) => prRow(pr, myPrBadge(pr), now, reviewersLabel(pr.review.reviewers)))),
+      prSection(
+        'レビュー中のPR',
+        snapshot.reviewRequests.map((pr) => prRow(pr, pr.isDraft ? 'draft' : 'open', now, authorLabel(pr.author))),
+      ),
     );
   }
 

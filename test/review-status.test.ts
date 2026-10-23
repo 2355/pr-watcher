@@ -14,6 +14,7 @@ describe('deriveAuthorReviewStatus', () => {
       state: 'none',
       needsFix: false,
       approved: false,
+      reviewers: [],
     });
   });
 
@@ -23,7 +24,7 @@ describe('deriveAuthorReviewStatus', () => {
       opinionatedReviews: [{ login: 'alice', state: 'changes_requested' }],
     });
 
-    expect(status).toEqual({ state: 'changes_requested', needsFix: true, approved: false });
+    expect(status).toEqual({ state: 'changes_requested', needsFix: true, approved: false, reviewers: ['alice'] });
   });
 
   it('changes requested のレビュアーに再レビューを依頼したら要修正が消える', () => {
@@ -33,7 +34,7 @@ describe('deriveAuthorReviewStatus', () => {
       pendingReviewers: ['alice'],
     });
 
-    expect(status).toEqual({ state: 'none', needsFix: false, approved: false });
+    expect(status).toEqual({ state: 'none', needsFix: false, approved: false, reviewers: ['alice'] });
   });
 
   it('commented のレビューも要修正として扱う', () => {
@@ -42,7 +43,7 @@ describe('deriveAuthorReviewStatus', () => {
       sidebarReviewers: [{ login: 'bob', state: 'commented' }],
     });
 
-    expect(status).toEqual({ state: 'commented', needsFix: true, approved: false });
+    expect(status).toEqual({ state: 'commented', needsFix: true, approved: false, reviewers: ['bob'] });
   });
 
   it('commented のレビュアーに再レビューを依頼したら要修正が消える', () => {
@@ -61,7 +62,7 @@ describe('deriveAuthorReviewStatus', () => {
       sidebarReviewers: [{ login: 'coderabbitai[bot]', state: 'commented' }],
     });
 
-    expect(status).toEqual({ state: 'none', needsFix: false, approved: false });
+    expect(status).toEqual({ state: 'none', needsFix: false, approved: false, reviewers: [] });
   });
 
   it('自分自身のレビューは無視する', () => {
@@ -79,7 +80,7 @@ describe('deriveAuthorReviewStatus', () => {
       opinionatedReviews: [{ login: 'alice', state: 'approved' }],
     });
 
-    expect(status).toEqual({ state: 'approved', needsFix: false, approved: true });
+    expect(status).toEqual({ state: 'approved', needsFix: false, approved: true, reviewers: ['alice'] });
   });
 
   it('approve と commented が混在すると要修正を優先して表示しつつ approved も保つ', () => {
@@ -89,7 +90,7 @@ describe('deriveAuthorReviewStatus', () => {
       sidebarReviewers: [{ login: 'bob', state: 'commented' }],
     });
 
-    expect(status).toEqual({ state: 'commented', needsFix: true, approved: true });
+    expect(status).toEqual({ state: 'commented', needsFix: true, approved: true, reviewers: ['bob', 'alice'] });
   });
 
   it('同じレビュアーの状態は merge_box の判定を優先する', () => {
@@ -99,7 +100,7 @@ describe('deriveAuthorReviewStatus', () => {
       sidebarReviewers: [{ login: 'alice', state: 'commented' }],
     });
 
-    expect(status).toEqual({ state: 'approved', needsFix: false, approved: true });
+    expect(status).toEqual({ state: 'approved', needsFix: false, approved: true, reviewers: ['alice'] });
   });
 
   it('サイドバーを取得できなかったときは merge_box だけで判定する', () => {
@@ -109,6 +110,25 @@ describe('deriveAuthorReviewStatus', () => {
       sidebarReviewers: null,
     });
 
-    expect(status).toEqual({ state: 'changes_requested', needsFix: true, approved: false });
+    expect(status).toEqual({ state: 'changes_requested', needsFix: true, approved: false, reviewers: ['alice'] });
+  });
+
+  it('まだレビューしていない依頼先もレビュアーに含める', () => {
+    const status = deriveAuthorReviewStatus({ ...base, pendingReviewers: ['carol'] });
+
+    expect(status.reviewers).toEqual(['carol']);
+  });
+
+  it('bot と自分はレビュアーに含めない', () => {
+    const status = deriveAuthorReviewStatus({
+      ...base,
+      sidebarReviewers: [
+        { login: 'coderabbitai[bot]', state: 'commented' },
+        { login: 'me', state: 'commented' },
+      ],
+      pendingReviewers: ['copilot[bot]'],
+    });
+
+    expect(status.reviewers).toEqual([]);
   });
 });

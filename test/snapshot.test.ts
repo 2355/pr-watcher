@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGitHubClient } from '../src/github/client';
 import { buildSnapshot } from '../src/snapshot';
-import { fixturesAvailable, loadJson, loadText, rawPulls } from './helpers/fixtures';
+import { fixturesAvailable, loadJson, loadText, rawMergeBox, rawPulls } from './helpers/fixtures';
 
 type Route = (url: URL, headers: Headers) => Response | undefined;
 
@@ -66,6 +66,9 @@ const snapshotWith = (routes: Route[]) =>
 describe.runIf(fixturesAvailable)('buildSnapshot', () => {
   it('自分の PR とレビュー依頼を CI・レビュー状態付きでまとめる', async () => {
     const snapshot = await snapshotWith(githubRoutes());
+    const requested = rawMergeBox('merge-box-pending-rerequest.json')
+      .pendingReviewRequests.map((r) => r.reviewer.login)
+      .filter((login) => !login.endsWith('[bot]'));
 
     expect(snapshot).toEqual({
       status: 'ok',
@@ -75,7 +78,7 @@ describe.runIf(fixturesAvailable)('buildSnapshot', () => {
           number: myPr().number,
           repo: myPr().repoNameWithOwner,
           ci: 'success',
-          review: { state: 'none', needsFix: false, approved: false },
+          review: { state: 'none', needsFix: false, approved: false, reviewers: requested },
         }),
       ],
       reviewRequests: [],

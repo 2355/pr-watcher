@@ -108,6 +108,38 @@ describe('renderPopup: 一覧', () => {
 
     expect(section('自分のPR').querySelector('.waiting')).toBeNull();
   });
+
+  it('自分の PR にはレビュアーを @ 付きで出す', () => {
+    render(ok({ myPrs: [myPr({ review: { reviewers: ['alice', 'bob'] } })] }));
+
+    expect(section('自分のPR').querySelector('.reviewers')!.textContent).toBe('@alice @bob');
+  });
+
+  it('レビュアーがいない PR にはレビュアー欄を出さない', () => {
+    render(ok({ myPrs: [myPr({ review: { reviewers: [] } })] }));
+
+    expect(section('自分のPR').querySelector('.reviewers')).toBeNull();
+  });
+
+  it('レビュアーを持たない古い形の snapshot でも描画できる', () => {
+    const { reviewers: _, ...oldReview } = myPr().review;
+    render(ok({ myPrs: [{ ...myPr(), review: oldReview as MyPullRequest['review'] }] }));
+
+    expect(section('自分のPR').querySelector('.title')!.textContent).toBe('タイトル');
+    expect(section('自分のPR').querySelector('.reviewers')).toBeNull();
+  });
+
+  it('レビュー中の PR には作者を by @ 付きで出す', () => {
+    render(ok({ reviewRequests: [row({ author: 'carol' })] }));
+
+    expect(section('レビュー中のPR').querySelector('.author')!.textContent).toBe('by @carol');
+  });
+
+  it('自分の PR には作者を出さない', () => {
+    render(ok({ myPrs: [myPr()] }));
+
+    expect(section('自分のPR').querySelector('.author')).toBeNull();
+  });
 });
 
 describe('renderPopup: 状態', () => {
