@@ -14,7 +14,7 @@ const MY_PR_PREFIX = myPrKey('');
 export const waitingSinceOf = (snapshot: Snapshot, previous: WaitingSince): WaitingSince | undefined => {
   // 取得に失敗したときは待ちが終わったのか分からないので、記録を消さずに残す
   if (snapshot.status !== 'ok') return undefined;
-  // 上限から溢れやすいのは更新の無い＝長く待っている PR なので、溢れただけで記録を消すと最も知りたい値が失われる
+  // 一覧は作成日の新しい順なので、上限から溢れるのは作成の古い＝長く待っていそうな PR。溢れただけで記録を消すと最も知りたい値が失われる
   const keptPrefixes = [
     ...(snapshot.truncated.reviewRequests ? [REVIEW_PREFIX] : []),
     ...(snapshot.truncated.myPrs ? [MY_PR_PREFIX] : []),
